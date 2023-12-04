@@ -42,6 +42,11 @@ describe("POST /api/movies", () => {
 
     expect(movieInDatabase).toHaveProperty("title");
     expect(movieInDatabase.title).toStrictEqual(newMovie.title);
+
+    const deleted = await request(app).delete(
+      `/api/movies/${response.body.id}`
+    );
+    expect(deleted.status).toEqual(204);
   });
 
   it("should return an error", async () => {
@@ -129,6 +134,9 @@ describe("PUT /api/movies/:id", () => {
 
     expect(movieInDatabase).toHaveProperty("duration");
     expect(movieInDatabase.duration).toStrictEqual(updatedMovie.duration);
+
+    const deleted = await request(app).delete(`/api/movies/${id}`);
+    expect(deleted.status).toEqual(204);
   });
   it("should return an error", async () => {
     const movieWithMissingProps = { title: "Harry Potter" };
@@ -149,6 +157,48 @@ describe("PUT /api/movies/:id", () => {
     };
 
     const response = await request(app).put("/api/movies/0").send(newMovie);
+
+    expect(response.status).toEqual(404);
+  });
+});
+
+describe("DELETE /api/movies/:id", () => {
+  it("should delete a movie", async () => {
+    const newMovie = {
+      title: "Holo histoire",
+      director: "Christopher",
+      year: "2020",
+      color: "1",
+      duration: 148,
+    };
+
+    const [result] = await database.query(
+      "INSERT INTO movies(title, director, year, color, duration) VALUES (?, ?, ?, ?, ?)",
+      [
+        newMovie.title,
+        newMovie.director,
+        newMovie.year,
+        newMovie.color,
+        newMovie.duration,
+      ]
+    );
+
+    const id = result.insertId;
+
+    const response = await request(app).delete(`/api/movies/${id}`);
+
+    expect(response.status).toEqual(204);
+
+    const [movies] = await database.query(
+      "SELECT * FROM movies WHERE id=?",
+      id
+    );
+
+    expect(movies.length).toEqual(0);
+  });
+
+  it("should return an error for non-existent movie", async () => {
+    const response = await request(app).delete("/api/movies/999");
 
     expect(response.status).toEqual(404);
   });

@@ -33,13 +33,15 @@ describe("POST /api/users", () => {
       "SELECT * FROM users WHERE id=?",
       response.body.id
     );
-
+    const idP = response.body.id;
     const [userInDatabase] = result;
 
     expect(userInDatabase).toHaveProperty("id");
 
     expect(userInDatabase).toHaveProperty("firstname");
     expect(userInDatabase.firstname).toStrictEqual(newUser.firstname);
+    const deletedP = await request(app).delete(`/api/users/${idP}`);
+    expect(deletedP.status).toEqual(204);
   });
   it("should return an error", async () => {
     const userWithMissingProps = { firstname: "Nelson" };
@@ -123,6 +125,9 @@ describe("PUT /api/users/:id", () => {
 
     expect(userInDatabase).toHaveProperty("language");
     expect(userInDatabase.language).toStrictEqual(updatedUser.language);
+
+    const deleted = await request(app).delete(`/api/users/${id}`);
+    expect(deleted.status).toEqual(204);
   });
   it("should return an error", async () => {
     const userWithMissingProps = { firstname: "Potter" };
@@ -143,6 +148,45 @@ describe("PUT /api/users/:id", () => {
     };
 
     const response = await request(app).put("/api/users/0").send(newUser);
+
+    expect(response.status).toEqual(404);
+  });
+});
+
+describe("DELETE /api/users/:id", () => {
+  it("should delete a user", async () => {
+    const newUser = {
+      firstname: "Deleted",
+      lastname: "You",
+      email: `${crypto.randomUUID()}@wild.co`,
+      city: "Paris",
+      language: "French",
+    };
+
+    const [result] = await database.query(
+      "INSERT INTO users(firstname, lastname, email, city, language) VALUES (?, ?, ?, ?, ?)",
+      [
+        newUser.firstname,
+        newUser.lastname,
+        newUser.email,
+        newUser.city,
+        newUser.language,
+      ]
+    );
+
+    const id = result.insertId;
+
+    const response = await request(app).delete(`/api/users/${id}`);
+
+    expect(response.status).toEqual(204);
+
+    const [users] = await database.query("SELECT * FROM users WHERE id=?", id);
+
+    expect(users.length).toEqual(0);
+  });
+
+  it("should return an error for non-existent user", async () => {
+    const response = await request(app).delete("/api/users/999");
 
     expect(response.status).toEqual(404);
   });
